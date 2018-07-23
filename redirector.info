@@ -1,0 +1,5 @@
+name = Redirector
+description = "Makes a redirect to an external site instead of a standard transition"
+core = 7.x
+
+configure = admin/config/content/redirector

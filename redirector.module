@@ -1,0 +1,146 @@
+<?php
+
+/**
+ * Implemets hook_menu().
+ */
+function redirector_menu() {
+  $items = array();
+
+  $items['admin/config/content/redirector'] = array(
+    'title' => 'Redirector',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('redirector_settings_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+  );
+
+  $redirector_url = variable_get('redirector_url');
+	$items[$redirector_url] = array(
+		'delivery callback' => 'redirector_view',
+		'access callback' => TRUE,
+		'expanded' => TRUE,
+	);
+	return $items;
+}
+
+function redirector_settings_form($form) {
+  $form['redirector_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Redirector url'),
+    '#default_value' => variable_get('redirector_url'),
+    '#required' => TRUE,
+    '#maxlength' => 255,
+  );
+
+  $form['redirector_waiting_time'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Waiting time'),
+    '#default_value' => variable_get('redirector_waiting_time'),
+    '#required' => FALSE,
+    '#maxlength' => 30,
+    '#element_validate' => array('element_validate_number'),
+  );
+
+  $form = system_settings_form($form);
+  array_unshift($form['#submit'], 'redirector_settings_form_submit');
+
+  return $form;
+}
+
+/**
+ * Module configuration form handler.
+ *
+ * @param array $form
+ * @param array $form_state
+ *
+ * @see payer_settings()
+ */
+function redirector_settings_form_submit($form, &$form_state) {
+  $old_url = variable_get('redirector_url');
+  $new_url = $form_state['values']['redirector_url'];
+
+  if ($old_url != $new_url) {
+    menu_rebuild();
+    drupal_set_message(t('The menu has been rebuilt.'));
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function redirector_theme() {
+	$module_path = drupal_get_path('module', 'redirector');
+
+	return array(
+		'redirector_success' => array(
+			'variables' => array(
+				'url' => NULL,
+        'wait' => NULL,
+			),
+			'template' => 'redirector_success',
+			'path' => $module_path . '/templates',
+		),
+
+		'redirector_error' => array(
+			'variables' => array(
+				'error' => NULL,
+			),
+			'template' => 'redirector_error',
+			'path' => $module_path . '/templates',
+		),
+	);
+}
+
+/**
+ * Delivery callback.
+ */
+function redirector_view() {
+	// clear get param
+	$url = strip_tags($_GET['url']);
+	$url = htmlspecialchars($url);
+	$url = addslashes($url);
+
+	$error_handler = redirector_error_handler($url);
+
+	if (gettype($error_handler) != 'string') {
+    $wait = strip_tags($_GET['wait']);
+    $wait = htmlspecialchars($wait);
+    $wait = addslashes($wait);
+
+		if (empty($wait)) {
+      $wait = variable_get('redirector_waiting_time');
+    }
+
+    print theme('redirector_success',
+      array(
+        'url' => $url,
+        'wait' => $wait
+      )
+    );
+
+		header( 'Refresh:' . $wait . '; URL=' . $url );
+		exit();
+	}
+	else {
+		print theme('redirector_error', array('error' => $error_handler));
+	}
+}
+
+/**
+ * Check url string for errors. Returns an error code or 1 if all is OK
+ *
+ * @param $url - url to which to implement a redirect
+ *
+ * @return string or bool
+ */
+function redirector_error_handler($url) {
+	if (empty($url)) {
+		return 'Параметр url не передан или пустой';
+	}
+	if (!preg_match('/\b(?:(?:https?):\/\/|www\.)[-a-zа-я0-9+&@#\/%?=~_|!:,.;]*[-a-zа-я0-9+&@#\/%=~_|]/i', $url)) {
+		return 'Параметр url не является ссылкой';
+	}
+
+	return true;
+}

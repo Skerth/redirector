@@ -1,0 +1,17 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function redirector_install() {
+  variable_set('redirector_url', 'go');
+  variable_set('redirector_waiting_time', '5');
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function redirector_uninstall() {
+  variable_del('redirector_url');
+  variable_del('redirector_waiting_time');
+}
